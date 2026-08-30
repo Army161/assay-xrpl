@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assay — tokenized asset intelligence for the XRP Ledger</title>
+<meta name="description" content="Who holds a tokenized asset, how concentrated that holding is, and what issuer controls exist on-ledger. Measured live from XRPL mainnet.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⚖️</text></svg>">
+<style>
+  :root{
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f2ef;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+    --seq-100:#cde2fb; --seq-250:#86b6ef; --seq-400:#3987e5; --seq-450:#2a78d6; --seq-550:#1c5cab; --seq-650:#104281;
+    --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+    --good-wash:rgba(12,163,12,.10); --warn-wash:rgba(250,178,25,.14); --crit-wash:rgba(208,59,59,.10);
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222220;
+      --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+      --seq-100:#104281; --seq-250:#184f95; --seq-400:#2a78d6; --seq-450:#3987e5; --seq-550:#6da7ec; --seq-650:#9ec5f4;
+      --good-wash:rgba(12,163,12,.16); --warn-wash:rgba(250,178,25,.16); --crit-wash:rgba(208,59,59,.16);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#222220;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --seq-100:#104281; --seq-250:#184f95; --seq-400:#2a78d6; --seq-450:#3987e5; --seq-550:#6da7ec; --seq-650:#9ec5f4;
+    --good-wash:rgba(12,163,12,.16); --warn-wash:rgba(250,178,25,.16); --crit-wash:rgba(208,59,59,.16);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--plane);color:var(--ink);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:76rem;margin:0 auto;padding:0 1.25rem 5rem}
+  a{color:var(--seq-450)}
+  h1,h2,h3{margin:0;letter-spacing:-.02em}
+  p{margin:0}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* header */
+  header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--plane) 92%,transparent);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--grid)}
+  .bar{max-width:76rem;margin:0 auto;padding:.7rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:.5rem;font-weight:680;font-size:1.05rem;letter-spacing:-.03em}
+  .brand em{font-style:normal;color:var(--muted);font-weight:450;font-size:.74rem;letter-spacing:.04em}
+  .spacer{flex:1}
+  .live{display:flex;align-items:center;gap:.4rem;font:.72rem/1 var(--mono);color:var(--ink-2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
+  .dot.off{background:var(--critical)}
+  .ghost{font:600 .78rem var(--sans);padding:.4rem .65rem;border-radius:5px;cursor:pointer;
+    border:1px solid var(--grid);background:var(--surface);color:var(--ink)}
+  .ghost:hover{background:var(--surface-2)}
+
+  /* hero */
+  .hero{padding:2.6rem 0 1.4rem;display:flex;flex-direction:column;gap:.85rem;max-width:44rem}
+  .hero h1{font-size:clamp(1.65rem,4vw,2.35rem);line-height:1.08;text-wrap:balance}
+  .hero p{color:var(--ink-2);text-wrap:pretty}
+
+  /* controls */
+  .controls{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;padding:.5rem 0 1.4rem}
+  select,input[type=text]{font:.88rem var(--sans);padding:.52rem .6rem;border-radius:5px;
+    border:1px solid var(--grid);background:var(--surface);color:var(--ink);min-width:0}
+  input[type=text]{font-family:var(--mono);font-size:.8rem;width:23rem;max-width:100%}
+  .primary{font:650 .88rem var(--sans);padding:.55rem 1rem;border-radius:5px;cursor:pointer;border:1px solid var(--seq-450);
+    background:var(--seq-450);color:#fff}
+  .primary:hover{filter:brightness(1.07)}
+  .primary:disabled{opacity:.55;cursor:progress}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--seq-450);outline-offset:2px}
+
+  /* layout */
+  section{margin-top:2.2rem}
+  .eyebrow{font:650 .66rem/1.4 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+    padding-bottom:.6rem;border-bottom:1px solid var(--grid);margin-bottom:1rem;display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
+  .card{background:var(--surface);border:1px solid var(--ring);border-radius:8px}
+  .pad{padding:1.1rem 1.25rem}
+
+  /* stat tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:.75rem}
+  .tile{background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:1rem 1.1rem;
+    display:flex;flex-direction:column;gap:.25rem}
+  .tile dt{font:650 .64rem/1.4 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .tile dd{margin:0;font-size:1.85rem;line-height:1.1;font-weight:670;letter-spacing:-.035em}
+  .tile small{color:var(--ink-2);font-size:.78rem}
+
+  /* honesty banner — the most important component on the page */
+  .caveat{display:flex;gap:.7rem;align-items:flex-start;background:var(--warn-wash);
+    border:1px solid var(--warning);border-radius:8px;padding:.85rem 1rem;font-size:.86rem;margin-bottom:1rem}
+  .caveat .gl{font-weight:800;flex:none;font-family:var(--mono)}
+  .caveat b{display:block;margin-bottom:.15rem}
+
+  /* bars */
+  .bars{display:flex;flex-direction:column;gap:.3rem}
+  .brow{display:grid;grid-template-columns:minmax(6rem,11rem) 1fr minmax(4.5rem,auto);gap:.7rem;align-items:center;
+    font-size:.8rem;padding:.12rem 0}
+  .brow .addr{font-family:var(--mono);font-size:.72rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* display:block is load-bearing — these are spans, and an inline element
+     ignores width/height, which renders every bar as an empty track. */
+  .track{display:block;height:15px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+  .fill{display:block;height:100%;border-radius:0 3px 3px 0;background:var(--seq-450);min-width:2px}
+  .brow var{font-style:normal;font-family:var(--mono);font-size:.78rem;text-align:right;color:var(--ink)}
+
+  /* posture checks — glyph + label + colour, never colour alone */
+  .checks{display:flex;flex-direction:column;gap:.55rem}
+  .check{display:grid;grid-template-columns:auto 1fr;gap:.7rem;padding:.75rem .9rem;border-radius:7px;
+    border:1px solid var(--ring);background:var(--surface-2)}
+  .badge{display:inline-flex;align-items:center;gap:.32rem;font:700 .64rem/1 var(--mono);letter-spacing:.08em;
+    padding:.34rem .45rem;border-radius:4px;height:fit-content;white-space:nowrap}
+  .badge.ok{background:var(--good-wash);color:var(--good);border:1px solid var(--good)}
+  .badge.no{background:var(--crit-wash);color:var(--critical);border:1px solid var(--critical)}
+  .check h4{margin:0 0 .15rem;font-size:.88rem;font-weight:640}
+  .check .ev{font-size:.8rem;color:var(--ink-2)}
+  .check .mt{font-size:.78rem;color:var(--muted);margin-top:.25rem}
+  .check .an{font-size:.72rem;color:var(--muted);margin-top:.3rem;font-style:italic}
+
+  .emergency{background:var(--crit-wash);border:1px solid var(--critical);color:var(--critical);
+    border-radius:8px;padding:.9rem 1rem;font-weight:640;font-size:.9rem;margin-bottom:1rem}
+
+  /* table */
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.83rem;min-width:30rem}
+  th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--grid)}
+  th{font:650 .62rem/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  code{font:.85em var(--mono);background:var(--surface-2);padding:.12em .35em;border-radius:3px}
+
+  /* amendments */
+  .amds{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.5rem}
+  .amd{border:1px solid var(--ring);border-radius:6px;padding:.65rem .8rem;background:var(--surface)}
+  .amd .t{display:flex;align-items:center;gap:.45rem;font-size:.84rem;font-weight:620}
+  .amd .d{font-size:.75rem;color:var(--ink-2);margin-top:.2rem}
+
+  /* analyst */
+  .chat{display:flex;flex-direction:column;gap:.7rem}
+  .msgs{display:flex;flex-direction:column;gap:.7rem;max-height:26rem;overflow-y:auto}
+  .msg{padding:.8rem .95rem;border-radius:8px;font-size:.88rem;white-space:pre-wrap;border:1px solid var(--ring)}
+  .msg.u{background:var(--surface-2);align-self:flex-end;max-width:85%}
+  .msg.a{background:var(--surface)}
+  .tools{margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--grid);font:.7rem var(--mono);color:var(--muted)}
+  .ask{display:flex;gap:.5rem;flex-wrap:wrap}
+  .ask input{flex:1;min-width:14rem;font-family:var(--sans);font-size:.88rem}
+  .chips{display:flex;gap:.4rem;flex-wrap:wrap}
+  .chip{font:.75rem var(--sans);padding:.35rem .6rem;border-radius:99px;cursor:pointer;
+    border:1px solid var(--grid);background:var(--surface);color:var(--ink-2)}
+  .chip:hover{background:var(--surface-2);color:var(--ink)}
+
+  /* pricing */
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:.75rem}
+  .plan{background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:1.1rem;display:flex;flex-direction:column;gap:.6rem}
+  .plan.feat{border-color:var(--seq-450);box-shadow:0 0 0 1px var(--seq-450)}
+  .plan h3{font-size:1rem}
+  .price{font-size:1.6rem;font-weight:680;letter-spacing:-.03em}
+  .price span{font-size:.8rem;font-weight:450;color:var(--muted)}
+  .plan ul{margin:0;padding-left:1.05rem;font-size:.83rem;color:var(--ink-2);display:flex;flex-direction:column;gap:.25rem}
+  .plan button{margin-top:auto}
+
+  .skel{padding:2.6rem 1rem;text-align:center;color:var(--muted);font:.85rem var(--mono)}
+  .err{background:var(--crit-wash);border:1px solid var(--critical);color:var(--critical);border-radius:8px;padding:1rem;font-size:.87rem}
+  footer{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--grid);font-size:.82rem;color:var(--muted);
+    display:flex;flex-direction:column;gap:.6rem}
+  .hide{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <span class="brand">Assay <em>XRPL TOKENIZED ASSET INTELLIGENCE</em></span>
+    <span class="spacer"></span>
+    <span class="live"><span class="dot off" id="dot"></span><span id="ledger">connecting…</span></span>
+    <button class="ghost" id="theme" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Who actually holds this token, and what can the issuer do about it?</h1>
+    <p>Issued supply, holder concentration, and on-ledger issuer controls for any asset on the XRP&nbsp;Ledger — read from mainnet at the moment you ask. Concentration is measured against authoritative issued supply, and every figure states its own coverage.</p>
+  </div>
+
+  <div class="controls">
+    <select id="asset" aria-label="Asset"></select>
+    <input type="text" id="custom" placeholder="…or paste any XRPL issuer r-address" spellcheck="false">
+    <button class="primary" id="run">Assay</button>
+    <span class="live" id="status"></span>
+  </div>
+
+  <div id="report"><div class="card"><div class="skel">Pick an asset and press Assay to read live mainnet state.</div></div></div>
+
+  <section id="analyst-sec">
+    <div class="eyebrow"><span>Analyst</span><span id="analyst-state"></span></div>
+    <div class="card pad chat">
+      <div class="chips">
+        <button class="chip">Which issuer in the registry has the weakest compliance posture, and why?</button>
+        <button class="chip">Can the RLUSD issuer freeze a holder? Show the evidence.</button>
+        <button class="chip">Compare holder concentration between Bitstamp and GateHub USD.</button>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <div class="ask">
+        <input type="text" id="q" placeholder="Ask about any issuer, supply, concentration, or issuer control…">
+        <button class="primary" id="send">Ask</button>
+      </div>
+      <p class="tools">The analyst answers only from live tool calls against mainnet. It cannot see reserves — backing is an off-chain fact.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow"><span>Institutional ledger features</span><span id="amd-count"></span></div>
+    <div class="amds" id="amds"><div class="skel">loading…</div></div>
+  </section>
+
+  <section id="pricing">
+    <div class="eyebrow"><span>Pricing</span><span id="billing-state"></span></div>
+    <p style="color:var(--ink-2);margin-bottom:1rem;max-width:46rem">Tiers gate <strong>depth</strong>, not honesty. Every tier runs the same methodology and shows the same caveats — paid tiers page deeper through the holder set, which tightens the bounds on concentration.</p>
+    <div class="plans">
+      <div class="plan">
+        <h3>Free</h3><div class="price">$0</div>
+        <ul><li>5 holder pages</li><li>10-minute cache</li><li>3-asset watchlist</li><li>No key required</li></ul>
+      </div>
+      <div class="plan feat">
+        <h3>Desk</h3><div class="price" id="p-desk">—</div>
+        <ul><li>25 holder pages</li><li>3-minute cache</li><li>25-asset watchlist</li><li><strong>AI analyst included</strong></li></ul>
+        <button class="primary buy" data-tier="desk">Subscribe</button>
+      </div>
+      <div class="plan">
+        <h3>Firm</h3><div class="price" id="p-firm">—</div>
+        <ul><li>60 holder pages</li><li>1-minute cache</li><li>200-asset watchlist</li><li>2,000 analyst calls</li></ul>
+        <button class="primary buy" data-tier="firm">Subscribe</button>
+      </div>
+      <div class="plan">
+        <h3>Enterprise</h3><div class="price" id="p-enterprise">—</div>
+        <ul><li>Full holder coverage</li><li>Uncached</li><li>Unlimited watchlist</li><li>Unlimited analyst</li></ul>
+        <button class="primary buy" data-tier="enterprise">Subscribe</button>
+      </div>
+    </div>
+    <p class="tools" id="billing-note" style="margin-top:.8rem"></p>
+  </section>
+
+  <footer>
+    <p><strong>What this measures, stated plainly.</strong> Compliance posture reads on-ledger <em>capability</em> — whether an issuer retained the power to freeze, claw back, or gate holders. It is not a compliance certification, a licence check, or legal advice. An issuer scoring well can still be in breach; one scoring poorly may be fully licensed with off-chain controls.</p>
+    <p><strong>Reserves are invisible here.</strong> Issued supply is what the ledger says was issued. Whether it is backed is an off-chain fact no on-chain tool can verify.</p>
+    <p><strong>Concentration figures are lower bounds when coverage is partial.</strong> Large issuers have more trustlines than one request can page through. We divide by authoritative issued supply, never by the sampled sum, and label the coverage on every response.</p>
+    <p>Data: XRP Ledger mainnet via public RPC. <a href="/api/health">API health</a> · <a href="/api/amendments">amendments</a></p>
+  </footer>
+</div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const nf = (n, d = 0) => n == null || !isFinite(n) ? '—' : Number(n).toLocaleString(undefined,{maximumFractionDigits:d});
+const short = a => !a ? '—' : a.length > 16 ? a.slice(0,8) + '…' + a.slice(-5) : a;
+const compact = n => {
+  if (n == null || !isFinite(n)) return '—';
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return nf(n, 2);
+};
+
+/* theme */
+const savedTheme = (() => { try { return localStorage.getItem('assay-theme'); } catch { return null; } })();
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+$('theme').addEventListener('click', () => {
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('color-scheme').trim() === 'dark';
+  const next = dark ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('assay-theme', next); } catch {}
+});
+
+/* boot: health + registry + amendments */
+let HEALTH = {};
+(async () => {
+  try {
+    HEALTH = await (await fetch('/api/health')).json();
+    const ok = HEALTH.ok && HEALTH.ledger?.index;
+    $('dot').className = 'dot' + (ok ? '' : ' off');
+    $('ledger').textContent = ok ? `ledger ${nf(HEALTH.ledger.index)}` : 'ledger unreachable';
+
+    const sel = $('asset');
+    sel.innerHTML = (HEALTH.registry || [])
+      .map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+
+    $('analyst-state').textContent = HEALTH.analyst?.configured
+      ? 'live' : 'not configured on this deployment';
+    if (!HEALTH.analyst?.configured) { $('q').disabled = true; $('send').disabled = true; }
+
+    const amd = HEALTH.institutionalAmendments || {};
+    const live = Object.entries(amd).filter(([,v]) => v.enabled);
+    $('amd-count').textContent = `${live.length} of ${Object.keys(amd).length} live on mainnet`;
+    $('amds').innerHTML = Object.entries(amd).map(([name, v]) => `
+      <div class="amd">
+        <div class="t">
+          <span class="badge ${v.enabled ? 'ok' : 'no'}">${v.enabled ? '✓ LIVE' : '✗ OFF'}</span>
+          ${esc(name)}
+        </div>
+      </div>`).join('') || '<div class="skel">unavailable</div>';
+
+    // Billing buttons only become real once Stripe is actually wired.
+    const billed = HEALTH.billing?.configured;
+    document.querySelectorAll('.buy').forEach(b => {
+      if (!billed) { b.disabled = true; b.textContent = 'Not yet available'; }
+    });
+    $('billing-state').textContent = billed ? 'live' : 'not configured';
+    if (!billed) $('billing-note').textContent =
+      'Billing is not configured on this deployment. Every measurement endpoint is fully functional on the free tier.';
+  } catch (e) {
+    $('ledger').textContent = 'unreachable';
+  }
+})();
+
+/* assay */
+async function run() {
+  const custom = $('custom').value.trim();
+  const asset = custom || $('asset').value;
+  if (!asset) return;
+  $('run').disabled = true;
+  $('status').textContent = 'reading mainnet…';
+  $('report').innerHTML = '<div class="card"><div class="skel">paging holder set from mainnet…</div></div>';
+  try {
+    const res = await fetch(`/api/assay?asset=${encodeURIComponent(asset)}`);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    render(d);
+    $('status').textContent = d.cache === 'hit' ? 'cached' : 'live';
+  } catch (e) {
+    $('report').innerHTML = `<div class="err"><strong>Could not assay this asset.</strong><br>${esc(e.message)}
+      <br><br>Public XRPL endpoints throttle under load — try again shortly.</div>`;
+    $('status').textContent = '';
+  } finally { $('run').disabled = false; }
+}
+$('run').addEventListener('click', run);
+$('custom').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+
+function render(d) {
+  if (d.error) {
+    $('report').innerHTML = `<div class="err">${esc(d.error)}</div>`;
+    return;
+  }
+  const c = d.concentration || {};
+  const p = d.posture || {};
+  const a = d.asset || {};
+
+  const emergency = p.emergency
+    ? `<div class="emergency">⚠ ${esc(p.emergency)}</div>` : '';
+
+  const caveat = c.caveat ? `
+    <div class="caveat">
+      <span class="gl">!</span>
+      <span><b>Partial holder coverage — these are lower bounds.</b>${esc(c.caveat)}</span>
+    </div>` : '';
+
+  const maxBar = d.topHolders?.[0]?.pctOfSupply || 1;
+  const bars = (d.topHolders || []).slice(0, 12).map(h => `
+    <div class="brow">
+      <span class="addr" title="${esc(h.account)}">${esc(short(h.account))}</span>
+      <span class="track"><span class="fill" style="width:${Math.max(1, h.pctOfSupply / maxBar * 100)}%"></span></span>
+      <var>${h.pctOfSupply < 0.01 ? '<0.01' : nf(h.pctOfSupply, 3)}%</var>
+    </div>`).join('');
+
+  const checks = Object.entries(p.checks || {}).map(([, v]) => `
+    <div class="check">
+      <span class="badge ${v.pass ? 'ok' : 'no'}">${v.pass ? '✓ PASS' : '✗ FAIL'}</span>
+      <div>
+        <h4>${esc(v.label)}</h4>
+        <div class="ev">${esc(v.evidence)}</div>
+        <div class="mt">${esc(v.matters)}</div>
+        <div class="an">Anchor: ${esc(v.anchor)}</div>
+      </div>
+    </div>`).join('');
+
+  $('report').innerHTML = `
+    ${emergency}
+    <dl class="tiles">
+      <div class="tile"><dt>Issued supply</dt><dd class="mono">${compact(a.issuedSupply)}</dd>
+        <small>${esc(a.currency || '')} · ${nf(a.issuedSupply, 2)}</small></div>
+      <div class="tile"><dt>Compliance posture</dt><dd>${p.score ?? '—'}<span style="font-size:.9rem;color:var(--muted)">/100</span></dd>
+        <small>${esc(p.band || '')} — on-ledger capability only</small></div>
+      <div class="tile"><dt>Concentration (HHI)</dt><dd class="mono">${nf(c.hhi)}</dd>
+        <small>${esc(c.hhiBand?.band || '—')}</small></div>
+      <div class="tile"><dt>Holders observed</dt><dd class="mono">${nf(c.holdersObserved)}</dd>
+        <small>${c.coveragePct != null ? nf(c.coveragePct,2) + '% of supply covered' : '—'}</small></div>
+    </dl>
+
+    <section>
+      <div class="eyebrow"><span>Holder concentration</span>
+        <span>${c.complete ? 'full coverage' : 'partial coverage — lower bounds'}</span></div>
+      ${caveat}
+      <div class="card pad">
+        <div class="scroll" style="margin-bottom:1rem">
+          <table>
+            <thead><tr><th>Share of issued supply</th><th class="num">Top 1</th><th class="num">Top 5</th><th class="num">Top 10</th><th class="num">Top 50</th></tr></thead>
+            <tbody><tr><td>Observed</td>
+              <td class="num">${nf(c.top1Pct,3)}%</td><td class="num">${nf(c.top5Pct,3)}%</td>
+              <td class="num">${nf(c.top10Pct,3)}%</td><td class="num">${nf(c.top50Pct,3)}%</td></tr></tbody>
+          </table>
+        </div>
+        <div class="bars">${bars || '<div class="skel">no holders observed</div>'}</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow"><span>Issuer controls</span><span>${esc(p.band || '')}</span></div>
+      <div class="checks">${checks}</div>
+      <p class="tools" style="margin-top:.8rem">${esc(p.disclaimer || '')}</p>
+    </section>
+
+    <section>
+      <div class="eyebrow"><span>Provenance</span><span>${esc((d.observedAt||'').replace('T',' ').slice(0,19))} UTC</span></div>
+      <div class="card pad scroll">
+        <table>
+          <tbody>
+            <tr><th>Issuer account</th><td class="mono">${esc(d.account)}</td></tr>
+            <tr><th>Domain</th><td>${d.issuer?.domain ? esc(d.issuer.domain) : '<em style="color:var(--muted)">none published</em>'}</td></tr>
+            <tr><th>Transfer fee</th><td class="num">${nf(a.transferFeePct, 4)}%</td></tr>
+            <tr><th>Ledger index</th><td class="mono">${nf(d.provenance?.ledgerIndex)}</td></tr>
+            <tr><th>Holder pages fetched</th><td class="num">${nf(c.pagesFetched)} (tier ceiling ${nf(d.provenance?.holderPageCeiling)})</td></tr>
+            <tr><th>Trustlines scanned</th><td class="num">${nf(d.sampling?.trustlinesScanned)}</td></tr>
+            <tr><th>Source</th><td>${esc(d.provenance?.source || '')}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      ${d.upgradeNote ? `<p class="tools" style="margin-top:.7rem">${esc(d.upgradeNote)}</p>` : ''}
+    </section>`;
+}
+
+/* analyst */
+const msgs = $('msgs');
+function push(cls, html) {
+  const el = document.createElement('div');
+  el.className = 'msg ' + cls;
+  el.innerHTML = html;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+  return el;
+}
+async function ask(question) {
+  if (!question) return;
+  $('q').value = '';
+  push('u', esc(question));
+  const thinking = push('a', '<span style="color:var(--muted)">calling tools against mainnet…</span>');
+  $('send').disabled = true;
+  try {
+    const res = await fetch('/api/agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.hint ? `${d.error} — ${d.hint}` : d.error || `HTTP ${res.status}`);
+    const used = (d.toolsUsed || []).map(t => t.tool).filter((v,i,s) => s.indexOf(v) === i);
+    thinking.innerHTML = esc(d.answer)
+      + (used.length ? `<div class="tools">tools called: ${esc(used.join(', '))}</div>` : '');
+  } catch (e) {
+    thinking.innerHTML = `<span style="color:var(--critical)">${esc(e.message)}</span>`;
+  } finally { $('send').disabled = false; }
+}
+$('send').addEventListener('click', () => ask($('q').value.trim()));
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') ask($('q').value.trim()); });
+document.querySelectorAll('.chip').forEach(c =>
+  c.addEventListener('click', () => ask(c.textContent.trim())));
+
+/* checkout */
+document.querySelectorAll('.buy').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Opening…';
+    try {
+      const r = await fetch('/api/checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: btn.dataset.tier }),
+      });
+      const d = await r.json();
+      if (d.url) { location.href = d.url; return; }
+      throw new Error(d.error || 'Checkout unavailable');
+    } catch (e) {
+      $('billing-note').textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Subscribe';
+    }
+  });
+});
+</script>
+</body>
+</html>

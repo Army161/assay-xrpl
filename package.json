@@ -1,0 +1,26 @@
+{
+  "name": "assay-xrpl",
+  "version": "0.1.0",
+  "description": "Tokenized asset intelligence for the XRP Ledger. Issued supply, holder concentration, and on-ledger issuer controls — measured live from mainnet.",
+  "keywords": ["xrpl", "xrp-ledger", "rwa", "tokenization", "stablecoin", "compliance", "rlusd", "concentration-risk"],
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./scoring/concentration": "./src/scoring/concentration.mjs",
+    "./scoring/posture": "./src/scoring/posture.mjs",
+    "./xrpl/client": "./src/xrpl/client.mjs"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node test/scoring.test.mjs",
+    "test:live": "node test/live.test.mjs",
+    "dev": "node scripts/dev-server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  },
+  "repository": { "type": "git", "url": "https://github.com/Army161/assay-xrpl" }
+}
